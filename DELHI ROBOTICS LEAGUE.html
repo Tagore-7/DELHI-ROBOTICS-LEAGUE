@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Robotic Competition Registration</title>
+</head>
+<body>
+    <!-- Registration Form -->
+    <section id="registrationForm">
+        <h2>Student Registration</h2>
+
+        <form id="registrationForm">
+            <label for="name">Student Name:</label>
+            <input type="text" id="name" required>
+
+            <label for="phoneNumber">Phone Number:</label>
+            <input type="tel" id="phoneNumber" required>
+
+            <label for="email">Email:</label>
+            <input type="email" id="email" required>
+
+            <label for="teamid">TeamID:</label>
+            <input type="text" id="teamid" required>
+
+            <button type="submit">Register</button>
+        </form>
+    </section>
+
+    <!-- Organizer Verification -->
+    <section id="verificationSection" style="display: none;">
+        <h2>Organizer Verification</h2>
+
+        <div id="verificationList"></div>
+    </section>
+
+    <!-- Approved Registrations -->
+    <section id="approvedSection" style="display: none;">
+        <h2>Approved Registrations</h2>
+
+        <div id="approvedList"></div>
+    </section>
+
+    <!-- Rejected Registrations -->
+    <section id="rejectedSection" style="display: none;">
+        <h2>Rejected Registrations</h2>
+
+        <div id="rejectedList"></div>
+		
+	<!-- QR CODE  -->
+    <section id="QRCode" style="display: none;">
+        <h2>QR CODE</h2>
+
+        <div id="qrcode"></div>
+	
+    </section>
+	
+	<!-- video-feed  -->
+    <section id="Video-feed" style="display: none;">
+        <h2>Video Feed</h2>
+
+        <div id="video-feed"></div>
+		<video id="video-feed"></video>
+	
+    </section>
+	
+	
+<audio id="audio-welcome">
+    <source src="E:\Aws_Lab_Files\Welcome_audio.m4a" type="audio/mpeg">
+</audio>
+
+<audio id="audio-thank-you">
+    <source src="E:\Aws_Lab_Files\Thankyou_Audio.m4a" type="audio/mpeg">
+</audio>
+	
+	
+
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-database.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/dist/qrcode.min.js"></script>
+	<script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+	<script>
+  function generateQRCode(studentDetails) {
+    const qrCodeContainer = document.getElementById("qrcode");
+
+    // Create a new instance of the QRCode class
+    const qrCode = new QRCode(qrCodeContainer, {
+      text: JSON.stringify(studentDetails), // Convert studentDetails to JSON string
+      width: 200,
+      height: 200,
+    });
+
+    // Display the QR code on the webpage
+    qrCode.makeCode(JSON.stringify(studentDetails));
+  }
+</script>
+    <script>
+        // Initialize Firebase
+       import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+        const firebaseConfig = {
+            // Your Firebase configuration
+            // Add your Firebase SDK configuration here
+            apiKey: "AIzaSyAq23UDMqMsaPb7HjxCGtLRHRdKL4hgtPQ",
+  authDomain: "delhi-robotics-league.firebaseapp.com",
+  projectId: "delhi-robotics-league",
+  storageBucket: "delhi-robotics-league.appspot.com",
+  messagingSenderId: "902524800983",
+  appId: "1:902524800983:web:a3c25128ccf97df754c592",
+  measurementId: "G-XSS6L93CDL"
+        };
+		
+		const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+        firebase.initializeApp(firebaseConfig);
+
+        // Get a reference to the Firebase Realtime Database
+        const database = firebase.database();
+
+        // Registration Form submit event listener
+        const registrationForm = document.getElementById("registrationForm");
+        registrationForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+
+            // Get input values
+            const name = document.getElementById("name").value;
+            const phoneNumber = document.getElementById("phoneNumber").value;
+            const email = document.getElementById("email").value;
+            const teamid = document.getElementById("teamid").value;
+
+            // Store student registration in Firebase
+            database.ref("students").push({
+                name: name,
+                phoneNumber: phoneNumber,
+                email: email,
+                teamid: teamid,
+                status: "pending"
+            })
+            .then(function() {
+                console.log("Registration submitted successfully");
+                alert("Registration submitted successfully");
+                registrationForm.reset();
+            })
+            .catch(function(error) {
+                console.error("Error submitting registration: ", error);
+                alert("Error submitting registration. Please try again.");
+            });
+        });
+
+        // Organizer Verification - Fetch pending registrations from Firebase
+        const verificationSection = document.getElementById("verificationSection");
+        const verificationList = document.getElementById("verificationList");
+
+        function fetchPendingRegistrations() {
+            verificationList.innerHTML = ""; // Clear previous data
+
+            database.ref("students").orderByChild("status").equalTo("pending").on("value", function(snapshot) {
+                snapshot.forEach(function(childSnapshot) {
+                    const studentKey = childSnapshot.key;
+                    const studentData = childSnapshot.val();
+
+                    const registrationDetails = document.createElement("div");
+                    registrationDetails.innerHTML = `
+                        <h3>${studentData.name}</h3>
+                        <p>Phone Number: ${studentData.phoneNumber}</p>
+                        <p>Email: ${studentData.email}</p>
+                        <p>TeamID: ${studentData.teamid}</p>
+                        <button onclick="approveRegistration('${studentKey}')">Approve</button>
+                        <button onclick="rejectRegistration('${studentKey}')">Reject</button>
+                        <hr>
+                    `;
+
+                    verificationList.appendChild(registrationDetails);
+                });
+
+                verificationSection.style.display = "block";
+            });
+        }
+
+        // Function to approve student registration
+        function approveRegistration(studentKey) {
+            database.ref("students/" + studentKey).update({ status: "approved" })
+                .then(function() {
+                    console.log("Registration approved successfully");
+                    alert("Registration approved successfully");
+                })
+                .catch(function(error) {
+                    console.error("Error approving registration: ", error);
+                    alert("Error approving registration. Please try again.");
+                });
+        }
+
+        // Function to reject student registration
+        function rejectRegistration(studentKey) {
+            const confirmation = confirm("Are you sure you want to reject this registration?");
+
+            if (confirmation) {
+                database.ref("students/" + studentKey).remove()
+                    .then(function() {
+                        console.log("Registration rejected successfully");
+                        alert("Registration rejected successfully");
+                    })
+                    .catch(function(error) {
+                        console.error("Error rejecting registration: ", error);
+                        alert("Error rejecting registration. Please try again.");
+                    });
+            }
+        }
+
+        // Approved Registrations - Fetch approved registrations from Firebase
+        const approvedSection = document.getElementById("approvedSection");
+        const approvedList = document.getElementById("approvedList");
+
+        function fetchApprovedRegistrations() {
+            approvedList.innerHTML = ""; // Clear previous data
+
+            database.ref("students").orderByChild("status").equalTo("approved").on("value", function(snapshot) {
+                snapshot.forEach(function(childSnapshot) {
+                    const studentData = childSnapshot.val();
+
+                    const registrationDetails = document.createElement("div");
+                    registrationDetails.innerHTML = `
+                        <h3>${studentData.name}</h3>
+                        <p>Phone Number: ${studentData.phoneNumber}</p>
+                        <p>Email: ${studentData.email}</p>
+                        <p>TeamID: ${studentData.teamid}</p>
+                        <hr>
+                    `;
+
+                    approvedList.appendChild(registrationDetails);
+                });
+
+                approvedSection.style.display = "block";
+            });
+        }
+
+        // Rejected Registrations - Fetch rejected registrations from Firebase
+        const rejectedSection = document.getElementById("rejectedSection");
+        const rejectedList = document.getElementById("rejectedList");
+
+        function fetchRejectedRegistrations() {
+            rejectedList.innerHTML = ""; // Clear previous data
+
+            database.ref("students").orderByChild("status").equalTo("rejected").on("value", function(snapshot) {
+                snapshot.forEach(function(childSnapshot) {
+                    const studentData = childSnapshot.val();
+
+                    const registrationDetails = document.createElement("div");
+                    registrationDetails.innerHTML = `
+                        <h3>${studentData.name}</h3>
+                        <p>Phone Number: ${studentData.phoneNumber}</p>
+                        <p>Email: ${studentData.email}</p>
+                        <p>TeamID: ${studentData.teamid}</p>
+                        <hr>
+                    `;
+
+                    rejectedList.appendChild(registrationDetails);
+                });
+
+                rejectedSection.style.display = "block";
+            });
+        }
+
+        // Fetch and display the registration data on page load
+        window.addEventListener("load", function() {
+            fetchPendingRegistrations();
+            fetchApprovedRegistrations();
+            fetchRejectedRegistrations();
+        });
+    </script>
+</body>
+</html>
